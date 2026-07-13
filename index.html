@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UNLOCK-01</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0b0d;
+    --panel: #14161a;
+    --border: #24272c;
+    --text: #e6e4df;
+    --muted: #7a7f87;
+    --signal: #e0473d;
+    --signal-dim: #7a2b26;
+    --data: #d9a441;
+    --ok: #4caf7d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 18px;
+    margin-bottom: 36px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .agent-id {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 22px;
+    letter-spacing: 0.02em;
+  }
+  .agent-id span { color: var(--data); }
+  #statusLine {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background: var(--muted); margin-right: 6px; }
+  .dot.on { background: var(--ok); }
+
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 0 30px;
+  }
+  .scan-btn {
+    position: relative;
+    width: 168px;
+    height: 168px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #1a1d22, #0a0b0d 70%);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    transition: box-shadow .3s ease, border-color .3s ease;
+    box-shadow: 0 0 0 0 rgba(224,71,61,0.0);
+  }
+  .scan-btn:hover { border-color: var(--signal); box-shadow: 0 0 30px -4px rgba(224,71,61,0.35); }
+  .scan-btn:focus-visible { outline: 2px solid var(--data); outline-offset: 4px; }
+  .scan-btn .ring {
+    position: absolute; inset: -1px; border-radius: 50%;
+    border: 1px solid var(--signal-dim);
+    opacity: 0;
+  }
+  .scan-btn.scanning .ring {
+    opacity: 1;
+    animation: sweep 1.6s linear infinite;
+    border-top-color: var(--signal);
+  }
+  @keyframes sweep { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .scan-btn.scanning .ring { animation: none; opacity: .6; }
+  }
+  .hero-label { margin-top: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); text-align: center; max-width: 380px; }
+
+  .controls {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 18px 20px;
+    margin-bottom: 28px;
+  }
+  .controls label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 8px; font-family: 'JetBrains Mono', monospace; }
+  .ticker-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .ticker-row input[type=text] {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    padding: 9px 12px;
+    border-radius: 4px;
+    width: 100px;
+    text-transform: uppercase;
+  }
+  .ticker-row input:focus-visible { outline: 2px solid var(--data); }
+  .suggest-btn {
+    background: var(--bg);
+    border: 1px solid var(--data);
+    color: var(--data);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .04em;
+    padding: 9px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background .2s ease;
+  }
+  .suggest-btn:hover { background: rgba(217,164,65,0.1); }
+  .suggest-btn:disabled { opacity: .5; cursor: default; }
+  .suggest-note { font-size: 12px; color: var(--muted); margin-top: 10px; font-family: 'JetBrains Mono', monospace; }
+  .toggle-row { display:flex; align-items:center; gap:8px; margin-top: 14px; font-size: 13px; color: var(--muted); }
+
+  .report { display: flex; flex-direction: column; gap: 16px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 20px;
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .ticker-name { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; }
+  .badge { font-family: 'JetBrains Mono', monospace; font-size: 11px; padding: 3px 8px; border-radius: 3px; border: 1px solid var(--border); }
+  .badge.high { color: var(--signal); border-color: var(--signal); }
+  .badge.moderate { color: var(--data); border-color: var(--data); }
+  .badge.low { color: var(--muted); }
+  .skipped { color: var(--muted); font-size: 13px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 14px; margin-top: 10px; }
+  .stat-label { font-size: 11px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+  .stat-value { font-family: 'JetBrains Mono', monospace; font-size: 14px; margin-top: 2px; }
+  .notes { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .notes li { margin-left: 16px; }
+  .setup-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
+  .tranches { display: flex; flex-direction: column; gap: 4px; }
+  .tranche-row { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 6px 10px; background: var(--bg); border-radius: 4px; }
+  .footer-note { margin-top: 40px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="agent-id">UNLOCK<span>-01</span></div>
+    <div id="statusLine"><span class="dot"></span>checking status…</div>
+  </header>
+
+  <div class="hero">
+    <button class="scan-btn" id="scanBtn">
+      <span class="ring"></span>
+      RUN SCAN
+    </button>
+    <div class="hero-label">Pulls the setup for up to 3 tickers below — funding, order book, tokenomics, squeeze score, wallet trace, short setup.</div>
+  </div>
+
+  <div class="controls">
+    <label for="t1">TICKERS UNLOCKING SOON (enter up to 3, or auto-fill from DropsTab)</label>
+    <div class="ticker-row">
+      <input type="text" id="t1" maxlength="10" placeholder="ARB" />
+      <input type="text" id="t2" maxlength="10" placeholder="OP" />
+      <input type="text" id="t3" maxlength="10" placeholder="STRK" />
+      <button id="suggestBtn" class="suggest-btn" type="button">SUGGEST FROM DROPSTAB</button>
+    </div>
+    <div id="suggestNote" class="suggest-note"></div>
+    <div class="toggle-row">
+      <input type="checkbox" id="sendHerald" checked />
+      <label for="sendHerald" style="margin:0;">Send report to HERALD (email) when scan completes</label>
+    </div>
+  </div>
+
+  <div class="report" id="report">
+    <div class="empty">No scan run yet.</div>
+  </div>
+
+  <div class="footer-note">
+    Manual review only — nothing here executes a trade automatically.<br/>
+    Squeeze score is a heuristic from funding rate, order book skew and recent price action — it does not verify market maker intent.
+  </div>
+</div>
+
+<script>
+async function refreshStatus() {
+  try {
+    const r = await fetch('/api/status');
+    const j = await r.json();
+    const dot = j.status === 'online' ? '<span class="dot on"></span>' : '<span class="dot"></span>';
+    const cfg = j.configured;
+    const missing = Object.entries(cfg).filter(([,v]) => !v).map(([k]) => k);
+    document.getElementById('statusLine').innerHTML = dot + 'online' +
+      (missing.length ? ' · not configured: ' + missing.join(', ') : ' · all sources configured');
+  } catch {
+    document.getElementById('statusLine').innerHTML = '<span class="dot"></span>offline';
+  }
+}
+refreshStatus();
+
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  if (Math.abs(n) < 1) return n.toPrecision(4);
+  return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
+}
+
+function renderCard(t) {
+  if (!t.cleared) {
+    const extraNotes = (t.squeeze && t.squeeze.notes) || [];
+    const notesHtml = extraNotes.length
+      ? `<ul class="notes">${extraNotes.map(n => `<li>${n}</li>`).join('')}</ul>`
+      : '';
+    return `<div class="card">
+      <div class="card-head"><span class="ticker-name">${t.ticker}</span><span class="badge low">SKIPPED</span></div>
+      <div class="skipped">${(t.vetoes || []).join('<br/>')}</div>
+      ${notesHtml}
+    </div>`;
+  }
+  const sq = t.squeeze;
+  const badgeClass = sq.label.toLowerCase();
+  const s = t.setup;
+  const tranches = s.entries.map(e =>
+    `<div class="tranche-row"><span>${e.label} (${e.sizePct}%)</span><span>${fmt(e.price)}</span></div>`
+  ).join('');
+  const notes = (sq.notes || []).map(n => `<li>${n}</li>`).join('');
+  const wallet = t.walletTrace && t.walletTrace.ok
+    ? (t.walletTrace.sellPressureSignal ? 'Transfer to exchange detected' : 'No transfer to exchange detected')
+    : (t.walletTrace ? t.walletTrace.reason : 'not checked');
+
+  return `<div class="card">
+    <div class="card-head">
+      <span class="ticker-name">${t.ticker}</span>
+      <span class="badge ${badgeClass}">SQUEEZE: ${sq.label.toUpperCase()} (${sq.score})</span>
+    </div>
+    <div class="grid">
+      <div><div class="stat-label">MARK PRICE</div><div class="stat-value">${fmt(t.funding ? t.funding.markPrice : null)}</div></div>
+      <div><div class="stat-label">FUNDING RATE</div><div class="stat-value">${t.funding ? (t.funding.fundingRate*100).toFixed(4)+'%' : '—'}</div></div>
+      <div><div class="stat-label">MARKET CAP</div><div class="stat-value">${t.tokenomics ? '$'+fmt(t.tokenomics.marketCap) : '—'}</div></div>
+      <div><div class="stat-label">FDV</div><div class="stat-value">${t.tokenomics ? '$'+fmt(t.tokenomics.fdv) : '—'}</div></div>
+      <div><div class="stat-label">VWAP SCORE (7D)</div><div class="stat-value">${t.vwap ? t.vwap.score.toFixed(0) : '—'}</div></div>
+      <div><div class="stat-label">WALLET TRACE</div><div class="stat-value" style="font-size:12px;">${wallet}</div></div>
+    </div>
+    <ul class="notes">${notes}</ul>
+    <div class="setup-title">Short setup</div>
+    <div class="tranches">${tranches}</div>
+    <div class="grid" style="margin-top:10px;">
+      <div><div class="stat-label">AVG ENTRY</div><div class="stat-value">${fmt(s.avgEntry)}</div></div>
+      <div><div class="stat-label">STOP LOSS</div><div class="stat-value" style="color:var(--signal);">${fmt(s.stopLoss)}</div></div>
+      <div><div class="stat-label">TP 1 / TP 2</div><div class="stat-value" style="color:var(--ok);">${fmt(s.takeProfit[0])} / ${fmt(s.takeProfit[1])}</div></div>
+      <div><div class="stat-label">R:R (TP1)</div><div class="stat-value">${s.rewardToRisk}</div></div>
+    </div>
+  </div>`;
+}
+
+document.getElementById('suggestBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('suggestBtn');
+  const note = document.getElementById('suggestNote');
+  btn.disabled = true;
+  note.textContent = 'Checking DropsTab...';
+  try {
+    const res = await fetch('/api/unlocks');
+    const j = await res.json();
+    if (!j.ok) {
+      note.textContent = j.reason || 'DropsTab unavailable — enter tickers manually.';
+      return;
+    }
+    if (j.suggestions.length === 0) {
+      note.textContent = `Checked ${j.totalUnlocksSeen || 0} upcoming unlocks — none have a live Binance perp right now.`;
+      return;
+    }
+    ['t1', 't2', 't3'].forEach((id, i) => {
+      document.getElementById(id).value = j.suggestions[i] ? j.suggestions[i].ticker : '';
+    });
+    note.textContent = `Filled from DropsTab: ${j.suggestions.map(s => s.ticker).join(', ')} — review before running the scan.`;
+  } catch (err) {
+    note.textContent = 'Error reaching DropsTab: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('scanBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('scanBtn');
+  const tickers = ['t1','t2','t3'].map(id => document.getElementById(id).value.trim()).filter(Boolean);
+  if (tickers.length === 0) {
+    alert('Enter at least one ticker.');
+    return;
+  }
+  btn.classList.add('scanning');
+  btn.disabled = true;
+  document.getElementById('report').innerHTML = '<div class="empty">Scanning…</div>';
+
+  try {
+    const res = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers, sendHerald: document.getElementById('sendHerald').checked })
+    });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || 'scan failed');
+    document.getElementById('report').innerHTML = j.report.tokens.map(renderCard).join('');
+  } catch (err) {
+    document.getElementById('report').innerHTML = `<div class="empty">Error: ${err.message}</div>`;
+  } finally {
+    btn.classList.remove('scanning');
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+{
+  "_readme": "exchangeWallets below are verified Binance hot wallets, confirmed live on Etherscan/BscScan (label 'Binance' + 'Exchange'). watchedWallets is still empty on purpose — those are unlock-recipient addresses specific to whichever token you're scanning, and only you can add the right one per ticker. See README 'Wallet tracing setup' for how.",
+  "exchangeWallets": {
+    "binance_eth": {
+      "chainId": 1,
+      "addresses": [
+        "0x28C6c06298d514Db089934071355E5743bf21d60",
+        "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+        "0x631fC1EA2270e98fBd9d92658eCE0f5a269Aa161",
+        "0xA180Fe01B906A1bE37BE6c534a3300785b20d947"
+      ]
+    },
+    "binance_bsc": {
+      "chainId": 56,
+      "addresses": [
+        "0xF977814e90dA44bFA03b6295A0616a897441aceC",
+        "0x631fC1EA2270e98fBd9d92658eCE0f5a269Aa161",
+        "0xeb2d2f1b8c558a40207669291fda468e50c8a0bb",
+        "0x4B16c5dE96EB2117bBE5fd171E4d203624B014aa"
+      ]
+    }
+  },
+  "watchedWallets": {
+    "_example_ARB": { "chainId": 1, "addresses": [] }
+  }
+}
