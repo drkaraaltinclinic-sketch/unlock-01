@@ -141,7 +141,28 @@ async function searchDropstabSlug(ticker) {
       return { ok: false, reason: `dropstab search ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}` };
     }
     const j = await res.json();
-    const list = j.data || j.result || j.items || (Array.isArray(j) ? j : []);
+
+    // Don't assume the first truthy field is an array — check explicitly,
+    // including one level of nesting, and log the real shape if none match
+    // instead of crashing on .find() against a non-array.
+    let list = null;
+    if (Array.isArray(j)) list = j;
+    else if (Array.isArray(j.data)) list = j.data;
+    else if (Array.isArray(j.result)) list = j.result;
+    else if (Array.isArray(j.items)) list = j.items;
+    else if (Array.isArray(j.coins)) list = j.coins;
+    else if (j.data && Array.isArray(j.data.items)) list = j.data.items;
+    else if (j.data && Array.isArray(j.data.coins)) list = j.data.coins;
+    else if (j.data && Array.isArray(j.data.results)) list = j.data.results;
+
+    if (!list) {
+      console.error(
+        "[dropstab] nonStrictSearch response had no recognizable array field — raw sample:",
+        JSON.stringify(j).slice(0, 500)
+      );
+      return { ok: false, reason: "DropsTab search response had no recognizable list of results" };
+    }
+
     const match = list.find(
       (c) => String(c.symbol || c.ticker || "").toLowerCase() === ticker.toLowerCase()
     );
