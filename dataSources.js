@@ -142,11 +142,12 @@ async function searchDropstabSlug(ticker) {
     }
     const j = await res.json();
 
-    // Don't assume the first truthy field is an array — check explicitly,
-    // including one level of nesting, and log the real shape if none match
-    // instead of crashing on .find() against a non-array.
+    // Real shape confirmed from production logs: { status, data: { content: [...] } }
+    // Kept the other guesses as fallbacks in case DropsTab's shape varies
+    // by endpoint version, but data.content is the one that's actually real.
     let list = null;
     if (Array.isArray(j)) list = j;
+    else if (j.data && Array.isArray(j.data.content)) list = j.data.content;
     else if (Array.isArray(j.data)) list = j.data;
     else if (Array.isArray(j.result)) list = j.result;
     else if (Array.isArray(j.items)) list = j.items;
@@ -163,9 +164,15 @@ async function searchDropstabSlug(ticker) {
       return { ok: false, reason: "DropsTab search response had no recognizable list of results" };
     }
 
-    const match = list.find(
+    // Multiple different projects can share the same ticker symbol (seen in
+    // production: two "SOLV" entries, only one actively trading) — among
+    // exact symbol matches, prefer the one that's actually trading rather
+    // than just taking whichever the API listed first.
+    const exactMatches = list.filter(
       (c) => String(c.symbol || c.ticker || "").toLowerCase() === ticker.toLowerCase()
     );
+    const match =
+      exactMatches.find((c) => c.trading === "CURRENTLY_TRADING") || exactMatches[0];
     if (!match) {
       if (list.length > 0) {
         console.error(
