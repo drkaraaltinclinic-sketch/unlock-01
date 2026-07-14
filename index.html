@@ -154,6 +154,9 @@
   .tranche-row { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 6px 10px; background: var(--bg); border-radius: 4px; }
   .footer-note { margin-top: 40px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+  .herald-status { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 10px 16px; border-radius: 4px; margin-bottom: 14px; }
+  .herald-status.ok { background: rgba(76,175,125,0.1); color: var(--ok); border: 1px solid var(--ok); }
+  .herald-status.fail { background: rgba(224,71,61,0.1); color: var(--signal); border: 1px solid var(--signal); }
 </style>
 </head>
 <body>
@@ -312,7 +315,18 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || 'scan failed');
-    document.getElementById('report').innerHTML = j.report.tokens.map(renderCard).join('');
+
+    let heraldBanner = '';
+    if (document.getElementById('sendHerald').checked) {
+      if (j.herald && j.herald.ok) {
+        heraldBanner = `<div class="herald-status ok">✓ Sent to HERALD (email)</div>`;
+      } else {
+        const reason = (j.herald && j.herald.reason) || 'unknown reason';
+        heraldBanner = `<div class="herald-status fail">✗ HERALD email failed: ${reason}</div>`;
+      }
+    }
+
+    document.getElementById('report').innerHTML = heraldBanner + j.report.tokens.map(renderCard).join('');
   } catch (err) {
     document.getElementById('report').innerHTML = `<div class="empty">Error: ${err.message}</div>`;
   } finally {
