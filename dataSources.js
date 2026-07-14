@@ -205,20 +205,43 @@ async function getTokenomics(ticker) {
       const body = await res.text().catch(() => "");
       return { ok: false, reason: `dropstab detailed ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}` };
     }
-    const d = await res.json();
-    const price = d.price ?? d.currentPrice ?? d.priceUsd;
-    const marketCap = d.marketCap ?? d.market_cap;
-    const fdv = d.fdv ?? d.fullyDilutedValuation ?? d.fullyDilutedMarketCap;
-    const circulatingSupply = d.circulatingSupply ?? d.circulating_supply;
-    const totalSupply = d.totalSupply ?? d.total_supply;
-    const maxSupply = d.maxSupply ?? d.max_supply;
+    const raw = await res.json();
+    // Real shape confirmed from production logs: { status, data: { ... } }
+    // — the actual coin object is nested under "data", not top-level.
+    const d = (raw && typeof raw.data === "object" && raw.data) ? raw.data : raw;
+
+    // price and marketCap are themselves objects keyed by currency, e.g.
+    // { "USD": 0.00261, "BTC": ..., "ETH": ... } — confirmed from production
+    // logs — not plain numbers like most other sources return.
+    const unwrapUsd = (field) => {
+      if (field == null) return null;
+      if (typeof field === "number") return field;
+      if (typeof field === "object" && field.USD != null) return field.USD;
+      return null;
+    };
+
+    const price = unwrapUsd(d.price) ?? unwrapUsd(d.currentPrice) ?? unwrapUsd(d.priceUsd);
+    const marketCap = unwrapUsd(d.marketCap) ?? unwrapUsd(d.market_cap);
+    const fdv = unwrapUsd(d.fdv) ?? unwrapUsd(d.fullyDilutedValuation) ?? unwrapUsd(d.fullyDilutedMarketCap);
+    const circulatingSupply = d.circulatingSupply ?? d.circulating_supply ?? d.supply?.circulating;
+    const totalSupply = d.totalSupply ?? d.total_supply ?? d.supply?.total;
+    const maxSupply = d.maxSupply ?? d.max_supply ?? d.supply?.max;
 
     if (price == null && marketCap == null) {
       console.error(
-        "[dropstab] coins/detailed response had none of the expected price/marketCap fields — raw sample:",
-        JSON.stringify(d).slice(0, 500)
+        "[dropstab] coins/detailed had no usable price/marketCap — top-level keys:",
+        JSON.stringify(Object.keys(d)),
+        "| price shape:", JSON.stringify(d.price),
+        "| marketCap shape:", JSON.stringify(d.marketCap)
       );
       return { ok: false, reason: "DropsTab detailed response had no recognizable price/market-cap fields" };
+    }
+
+    if (fdv == null || circulatingSupply == null) {
+      console.error(
+        `[dropstab] ${ticker}: price/marketCap OK but fdv or supply missing — top-level keys:`,
+        JSON.stringify(Object.keys(d))
+      );
     }
 
     return { ok: true, price, marketCap, fdv, circulatingSupply, totalSupply, maxSupply };
