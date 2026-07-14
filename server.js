@@ -135,6 +135,9 @@ app.post("/api/scan", async (req, res) => {
     let heraldResult = { ok: false, reason: "not requested" };
     if (req.body.sendHerald) {
       heraldResult = await sendHeraldReport(report);
+      if (!heraldResult.ok) {
+        console.error(`[herald] send failed: ${heraldResult.reason}`);
+      }
     }
 
     res.json({ report: saved, herald: heraldResult });
