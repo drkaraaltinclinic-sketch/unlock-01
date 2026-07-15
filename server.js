@@ -170,6 +170,22 @@ app.get("/api/unlocks", async (req, res) => {
   }
 });
 
+app.get("/api/gainers", async (req, res) => {
+  try {
+    const result = await ds.getTopGainers(3);
+    if (!result.ok) {
+      return res.json({ ok: false, reason: result.reason, suggestions: [] });
+    }
+    const suggestions = result.gainers.map((g) => ({
+      ticker: g.ticker,
+      priceChangePercent: g.priceChangePercent,
+    }));
+    res.json({ ok: true, suggestions });
+  } catch (err) {
+    res.status(500).json({ ok: false, reason: err.message, suggestions: [] });
+  }
+});
+
 app.get("/api/history", (req, res) => {
   const limit = parseInt(req.query.limit, 10) || 20;
   res.json(getRecent(limit));
