@@ -52,6 +52,32 @@ async function hasBinancePerp(ticker) {
   }
 }
 
+// Public endpoint, no key needed — same as everything else pulled from
+// Binance. Returns the top N USDT perpetuals by 24h price change %, for use
+// as an independent "already overheated" signal — not a claim these are
+// specifically pre-unlock, just currently the biggest movers.
+async function getTopGainers(limit = 10) {
+  try {
+    const perpSet = await getPerpSymbolSet();
+    const res = await fetchWithTimeout(`${FAPI}/fapi/v1/ticker/24hr`);
+    if (!res.ok) throw new Error(`ticker/24hr ${res.status}`);
+    const all = await res.json();
+    const gainers = all
+      .filter((t) => perpSet.has(t.symbol) && t.symbol.endsWith("USDT"))
+      .map((t) => ({
+        ticker: t.symbol.replace(/USDT$/, ""),
+        symbol: t.symbol,
+        priceChangePercent: parseFloat(t.priceChangePercent),
+      }))
+      .filter((t) => !isNaN(t.priceChangePercent))
+      .sort((a, b) => b.priceChangePercent - a.priceChangePercent)
+      .slice(0, limit);
+    return { ok: true, gainers };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
 async function getFundingRate(symbol) {
   try {
     const res = await fetchWithTimeout(`${FAPI}/fapi/v1/premiumIndex?symbol=${symbol}`);
@@ -370,6 +396,7 @@ async function getVwapScore(ticker, window = "7d") {
 
 module.exports = {
   hasBinancePerp,
+  getTopGainers,
   getFundingRate,
   getOpenInterest,
   getOrderBookImbalance,
