@@ -175,12 +175,13 @@
   </div>
 
   <div class="controls">
-    <label for="t1">TICKERS UNLOCKING SOON (enter up to 3, or auto-fill from DropsTab)</label>
+    <label for="t1">TICKERS (enter up to 3, or auto-fill from DropsTab unlocks or Binance gainers)</label>
     <div class="ticker-row">
       <input type="text" id="t1" maxlength="10" placeholder="ARB" />
       <input type="text" id="t2" maxlength="10" placeholder="OP" />
       <input type="text" id="t3" maxlength="10" placeholder="STRK" />
       <button id="suggestBtn" class="suggest-btn" type="button">SUGGEST FROM DROPSTAB</button>
+      <button id="gainersBtn" class="suggest-btn" type="button">TOP BINANCE GAINERS</button>
     </div>
     <div id="suggestNote" class="suggest-note"></div>
     <div class="toggle-row">
@@ -188,6 +189,7 @@
       <label for="sendHerald" style="margin:0;">Send report to HERALD (email) when scan completes</label>
     </div>
   </div>
+  <div class="hero-label" style="margin-top:-14px;margin-bottom:24px;">Top gainers is an independent signal — an already-overheated perpetual, not a confirmed unlock event. Treat it as its own hypothesis to track, not a guarantee.</div>
 
   <div class="report" id="report">
     <div class="empty">No scan run yet.</div>
@@ -291,6 +293,34 @@ document.getElementById('suggestBtn').addEventListener('click', async () => {
     note.textContent = `Filled from DropsTab: ${j.suggestions.map(s => s.ticker).join(', ')} — review before running the scan.`;
   } catch (err) {
     note.textContent = 'Error reaching DropsTab: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('gainersBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('gainersBtn');
+  const note = document.getElementById('suggestNote');
+  btn.disabled = true;
+  note.textContent = 'Checking Binance Futures 24h gainers...';
+  try {
+    const res = await fetch('/api/gainers');
+    const j = await res.json();
+    if (!j.ok) {
+      note.textContent = j.reason || 'Binance gainers unavailable — enter tickers manually.';
+      return;
+    }
+    if (j.suggestions.length === 0) {
+      note.textContent = 'No gainers data returned right now.';
+      return;
+    }
+    ['t1', 't2', 't3'].forEach((id, i) => {
+      document.getElementById(id).value = j.suggestions[i] ? j.suggestions[i].ticker : '';
+    });
+    const summary = j.suggestions.map(s => `${s.ticker} (+${s.priceChangePercent.toFixed(1)}%)`).join(', ');
+    note.textContent = `Top 24h gainers: ${summary} — independent signal, not a confirmed unlock. Review before scanning.`;
+  } catch (err) {
+    note.textContent = 'Error reaching Binance: ' + err.message;
   } finally {
     btn.disabled = false;
   }
