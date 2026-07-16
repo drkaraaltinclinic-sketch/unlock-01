@@ -9,6 +9,7 @@ const { generateShortSetup } = require("./tradeSetup");
 const { checkWalletTransfers } = require("./walletTrace");
 const { appendReport, getRecent } = require("./history");
 const { sendHeraldReport } = require("./mailer");
+const { getLlmTokenHolders } = require("./llmHolders");
 
 const app = express();
 app.use(cors());
@@ -17,7 +18,7 @@ app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 8080;
 
-async function analyzeTicker(ticker) {
+async function analyzeTicker(ticker, includeLlmHolders) {
   const perp = await ds.hasBinancePerp(ticker);
   if (!perp.ok || !perp.listed) {
     return {
@@ -50,6 +51,14 @@ async function analyzeTicker(ticker) {
     if (!result.ok) console.error(`[${ticker}] ${name} unavailable: ${result.reason}`);
   }
 
+  // Opt-in only — this is the slowest and only per-call-cost data source,
+  // so it never fires unless explicitly requested for this scan.
+  let llmHolders = null;
+  if (includeLlmHolders) {
+    llmHolders = await getLlmTokenHolders(ticker);
+    if (!llmHolders.ok) console.error(`[${ticker}] llmHolders unavailable: ${llmHolders.reason}`);
+  }
+
   const atr = klines.ok ? ds.computeATR(klines.candles) : null;
   const priceChange24hPct =
     klines.ok && klines.candles.length > 1
@@ -75,7 +84,16 @@ async function analyzeTicker(ticker) {
   const walletTrace = await checkWalletTransfers(ticker);
 
   if (!gate.cleared) {
-    return { ticker, cleared: false, vetoes: gate.vetoes, squeeze, tokenomics, vwap: vwap.ok ? vwap : null, walletTrace };
+    return {
+      ticker,
+      cleared: false,
+      vetoes: gate.vetoes,
+      squeeze,
+      tokenomics,
+      vwap: vwap.ok ? vwap : null,
+      walletTrace,
+      llmHolders: llmHolders && llmHolders.ok ? llmHolders : null,
+    };
   }
 
   const markPrice = funding.ok ? funding.markPrice : tokenomics.ok ? tokenomics.price : null;
@@ -93,6 +111,7 @@ async function analyzeTicker(ticker) {
     orderBook: book.ok ? book : null,
     vwap: vwap.ok ? vwap : null,
     walletTrace,
+    llmHolders: llmHolders && llmHolders.ok ? llmHolders : null,
     setup,
   };
 }
@@ -104,6 +123,7 @@ app.get("/api/status", (req, res) => {
     configured: {
       dropstab: !!process.env.DROPSTAB_API_KEY,
       etherscan: !!process.env.ETHERSCAN_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
       herald: !!(process.env.HERALD_GMAIL_USER && process.env.HERALD_GMAIL_APP_PASSWORD),
     },
   });
@@ -123,7 +143,8 @@ app.post("/api/scan", async (req, res) => {
       });
     }
 
-    const tokens = await Promise.all(tickers.map(analyzeTicker));
+    const includeLlmHolders = !!req.body.includeLlmHolders;
+    const tokens = await Promise.all(tickers.map((t) => analyzeTicker(t, includeLlmHolders)));
 
     const report = {
       generatedAt: new Date().toISOString(),
