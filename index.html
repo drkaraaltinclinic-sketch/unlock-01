@@ -152,6 +152,8 @@
   .setup-title { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: .05em; }
   .tranches { display: flex; flex-direction: column; gap: 4px; }
   .tranche-row { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 6px 10px; background: var(--bg); border-radius: 4px; }
+  .copy-snippet-btn { background: transparent; border: 1px solid var(--muted); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
+  .copy-snippet-btn:hover { border-color: var(--data); color: var(--data); }
   .footer-note { margin-top: 40px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
   .herald-status { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 10px 16px; border-radius: 4px; margin-bottom: 14px; }
@@ -227,12 +229,23 @@ function fmt(n) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+const CHAIN_ID_MAP = {
+  ethereum: 1, eth: 1, bsc: 56, 'bnb chain': 56, 'bnb smart chain': 56,
+  arbitrum: 42161, base: 8453, polygon: 137, avalanche: 43114, optimism: 10,
+};
+
 function renderLlmHolders(t) {
   if (!t.llmHolders || !t.llmHolders.holders || t.llmHolders.holders.length === 0) return '';
+  const chainKey = (t.llmHolders.chain || '').toLowerCase().trim();
+  const chainId = CHAIN_ID_MAP[chainKey] || null;
   const rows = t.llmHolders.holders.map(h => {
     const short = h.address && h.address.length > 12 ? `${h.address.slice(0, 6)}...${h.address.slice(-4)}` : (h.address || '?');
     const labelPart = h.label ? ` (${h.label})` : '';
-    return `<div class="tranche-row"><span>${short}${labelPart}</span><span>${h.percentage}%</span></div>`;
+    const isExchange = h.label && h.label.toLowerCase().includes('exchange');
+    const copyBtn = (!isExchange && h.address)
+      ? `<button class="copy-snippet-btn" data-ticker="${t.ticker}" data-chainid="${chainId || ''}" data-chainname="${t.llmHolders.chain || 'unknown'}" data-address="${h.address}">COPY SNIPPET</button>`
+      : '';
+    return `<div class="tranche-row"><span>${short}${labelPart}</span><span style="display:flex;align-items:center;gap:10px;">${h.percentage}% ${copyBtn}</span></div>`;
   }).join('');
   return `<div class="setup-title" style="color:var(--signal);">⚠ TOP HOLDERS — AI-SOURCED, UNVERIFIED${t.llmHolders.chain ? ` (${t.llmHolders.chain})` : ''}</div>
     <div class="tranches">${rows}</div>`;
@@ -340,6 +353,27 @@ document.getElementById('gainersBtn').addEventListener('click', async () => {
     note.textContent = 'Error reaching Binance: ' + err.message;
   } finally {
     btn.disabled = false;
+  }
+});
+
+document.getElementById('report').addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('copy-snippet-btn')) return;
+  const btn = e.target;
+  const ticker = btn.dataset.ticker;
+  const chainId = btn.dataset.chainid;
+  const chainName = btn.dataset.chainname;
+  const address = btn.dataset.address;
+
+  const chainIdLine = chainId ? chainId : `null /* unrecognized chain: "${chainName}" — look up the correct chainId and replace null */`;
+  const snippet = `"${ticker}": { "chainId": ${chainIdLine}, "addresses": ["${address}"] }`;
+
+  try {
+    await navigator.clipboard.writeText(snippet);
+    const original = btn.textContent;
+    btn.textContent = 'COPIED!';
+    setTimeout(() => { btn.textContent = original; }, 1500);
+  } catch (err) {
+    alert('Could not copy automatically — here is the snippet:\n\n' + snippet);
   }
 });
 
