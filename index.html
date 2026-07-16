@@ -235,7 +235,15 @@ const CHAIN_ID_MAP = {
 };
 
 function renderLlmHolders(t) {
-  if (!t.llmHolders || !t.llmHolders.holders || t.llmHolders.holders.length === 0) return '';
+  if (!t.llmHolders) return ''; // not requested for this scan — nothing to show
+  if (!t.llmHolders.ok) {
+    return `<div class="setup-title" style="color:var(--signal);">⚠ AI HOLDER LOOKUP FAILED</div>
+      <div class="skipped" style="margin-bottom:12px;">${t.llmHolders.reason || 'unknown reason'}</div>`;
+  }
+  if (!t.llmHolders.holders || t.llmHolders.holders.length === 0) {
+    return `<div class="setup-title" style="color:var(--signal);">⚠ AI HOLDER LOOKUP</div>
+      <div class="skipped" style="margin-bottom:12px;">Lookup succeeded but returned no holders.</div>`;
+  }
   const chainKey = (t.llmHolders.chain || '').toLowerCase().trim();
   const chainId = CHAIN_ID_MAP[chainKey] || null;
   const rows = t.llmHolders.holders.map(h => {
