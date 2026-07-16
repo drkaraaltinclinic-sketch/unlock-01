@@ -188,6 +188,10 @@
       <input type="checkbox" id="sendHerald" checked />
       <label for="sendHerald" style="margin:0;">Send report to HERALD (email) when scan completes</label>
     </div>
+    <div class="toggle-row">
+      <input type="checkbox" id="includeLlmHolders" />
+      <label for="includeLlmHolders" style="margin:0;">Include AI-sourced holder lookup (Claude API — slower, costs credits, unverified data)</label>
+    </div>
   </div>
   <div class="hero-label" style="margin-top:-14px;margin-bottom:24px;">Top gainers is an independent signal — an already-overheated perpetual, not a confirmed unlock event. Treat it as its own hypothesis to track, not a guarantee.</div>
 
@@ -223,6 +227,17 @@ function fmt(n) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function renderLlmHolders(t) {
+  if (!t.llmHolders || !t.llmHolders.holders || t.llmHolders.holders.length === 0) return '';
+  const rows = t.llmHolders.holders.map(h => {
+    const short = h.address && h.address.length > 12 ? `${h.address.slice(0, 6)}...${h.address.slice(-4)}` : (h.address || '?');
+    const labelPart = h.label ? ` (${h.label})` : '';
+    return `<div class="tranche-row"><span>${short}${labelPart}</span><span>${h.percentage}%</span></div>`;
+  }).join('');
+  return `<div class="setup-title" style="color:var(--signal);">⚠ TOP HOLDERS — AI-SOURCED, UNVERIFIED${t.llmHolders.chain ? ` (${t.llmHolders.chain})` : ''}</div>
+    <div class="tranches">${rows}</div>`;
+}
+
 function renderCard(t) {
   if (!t.cleared) {
     const extraNotes = (t.squeeze && t.squeeze.notes) || [];
@@ -233,6 +248,7 @@ function renderCard(t) {
       <div class="card-head"><span class="ticker-name">${t.ticker}</span><span class="badge low">SKIPPED</span></div>
       <div class="skipped">${(t.vetoes || []).join('<br/>')}</div>
       ${notesHtml}
+      ${renderLlmHolders(t)}
     </div>`;
   }
   const sq = t.squeeze;
@@ -259,6 +275,7 @@ function renderCard(t) {
       <div><div class="stat-label">VWAP SCORE (7D)</div><div class="stat-value">${t.vwap ? t.vwap.score.toFixed(0) : '—'}</div></div>
       <div><div class="stat-label">WALLET TRACE</div><div class="stat-value" style="font-size:12px;">${wallet}</div></div>
     </div>
+    ${renderLlmHolders(t)}
     <ul class="notes">${notes}</ul>
     <div class="setup-title">Short setup</div>
     <div class="tranches">${tranches}</div>
@@ -341,7 +358,11 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
     const res = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tickers, sendHerald: document.getElementById('sendHerald').checked })
+      body: JSON.stringify({
+        tickers,
+        sendHerald: document.getElementById('sendHerald').checked,
+        includeLlmHolders: document.getElementById('includeLlmHolders').checked
+      })
     });
     const j = await res.json();
     if (!res.ok) throw new Error(j.error || 'scan failed');
