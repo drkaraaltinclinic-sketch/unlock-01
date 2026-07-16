@@ -92,7 +92,7 @@ async function analyzeTicker(ticker, includeLlmHolders) {
       tokenomics,
       vwap: vwap.ok ? vwap : null,
       walletTrace,
-      llmHolders: llmHolders && llmHolders.ok ? llmHolders : null,
+      llmHolders, // pass through as-is (success, failure+reason, or null if not requested)
     };
   }
 
@@ -111,7 +111,7 @@ async function analyzeTicker(ticker, includeLlmHolders) {
     orderBook: book.ok ? book : null,
     vwap: vwap.ok ? vwap : null,
     walletTrace,
-    llmHolders: llmHolders && llmHolders.ok ? llmHolders : null,
+    llmHolders, // pass through as-is (success, failure+reason, or null if not requested)
     setup,
   };
 }
