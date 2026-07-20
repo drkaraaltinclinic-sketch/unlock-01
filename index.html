@@ -192,7 +192,7 @@
     </div>
     <div class="toggle-row">
       <input type="checkbox" id="includeLlmHolders" />
-      <label for="includeLlmHolders" style="margin:0;">Include AI-sourced holder lookup (Claude API — slower, costs credits, unverified data)</label>
+      <label for="includeLlmHolders" style="margin:0;">Include top holder lookup (AI resolves contract, Moralis returns real data — slower, costs credits)</label>
     </div>
   </div>
   <div class="hero-label" style="margin-top:-14px;margin-bottom:24px;">Top gainers is an independent signal — an already-overheated perpetual, not a confirmed unlock event. Treat it as its own hypothesis to track, not a guarantee.</div>
@@ -237,11 +237,11 @@ const CHAIN_ID_MAP = {
 function renderLlmHolders(t) {
   if (!t.llmHolders) return ''; // not requested for this scan — nothing to show
   if (!t.llmHolders.ok) {
-    return `<div class="setup-title" style="color:var(--signal);">⚠ AI HOLDER LOOKUP FAILED</div>
+    return `<div class="setup-title" style="color:var(--signal);">⚠ HOLDER LOOKUP FAILED</div>
       <div class="skipped" style="margin-bottom:12px;">${t.llmHolders.reason || 'unknown reason'}</div>`;
   }
   if (!t.llmHolders.holders || t.llmHolders.holders.length === 0) {
-    return `<div class="setup-title" style="color:var(--signal);">⚠ AI HOLDER LOOKUP</div>
+    return `<div class="setup-title" style="color:var(--signal);">⚠ HOLDER LOOKUP</div>
       <div class="skipped" style="margin-bottom:12px;">Lookup succeeded but returned no holders.</div>`;
   }
   const chainKey = (t.llmHolders.chain || '').toLowerCase().trim();
@@ -249,14 +249,21 @@ function renderLlmHolders(t) {
   const rows = t.llmHolders.holders.map(h => {
     const short = h.address && h.address.length > 12 ? `${h.address.slice(0, 6)}...${h.address.slice(-4)}` : (h.address || '?');
     const labelPart = h.label ? ` (${h.label})` : '';
-    const isExchange = h.label && h.label.toLowerCase().includes('exchange');
-    const copyBtn = (!isExchange && h.address)
+    // Moralis labels are real (e.g. "Binance Hot Wallet 20", "Coinbase 1") —
+    // any non-null label means it's a known/identified entity, not a
+    // candidate unlock/team wallet worth watching. Only unlabeled holders
+    // get a copy button.
+    const isKnownEntity = !!h.label;
+    const copyBtn = (!isKnownEntity && h.address)
       ? `<button class="copy-snippet-btn" data-ticker="${t.ticker}" data-chainid="${chainId || ''}" data-chainname="${t.llmHolders.chain || 'unknown'}" data-address="${h.address}">COPY SNIPPET</button>`
       : '';
     return `<div class="tranche-row"><span>${short}${labelPart}</span><span style="display:flex;align-items:center;gap:10px;">${h.percentage}% ${copyBtn}</span></div>`;
   }).join('');
-  return `<div class="setup-title" style="color:var(--signal);">⚠ TOP HOLDERS — AI-SOURCED, UNVERIFIED${t.llmHolders.chain ? ` (${t.llmHolders.chain})` : ''}</div>
-    <div class="tranches">${rows}</div>`;
+  const contractLine = t.llmHolders.contractAddress
+    ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Contract (AI-resolved, verify before trusting): ${t.llmHolders.contractAddress}</div>`
+    : '';
+  return `<div class="setup-title" style="color:var(--signal);">TOP HOLDERS — via Moralis${t.llmHolders.chain ? ` (${t.llmHolders.chain})` : ''}</div>
+    <div class="tranches">${rows}</div>${contractLine}`;
 }
 
 function renderCard(t) {
