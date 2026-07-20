@@ -10,6 +10,7 @@ const { checkWalletTransfers } = require("./walletTrace");
 const { appendReport, getRecent } = require("./history");
 const { sendHeraldReport } = require("./mailer");
 const { getLlmTokenHolders } = require("./llmHolders");
+const { saveWatchedWallet } = require("./githubWriter");
 
 const app = express();
 app.use(cors());
@@ -125,6 +126,7 @@ app.get("/api/status", (req, res) => {
       etherscan: !!process.env.ETHERSCAN_API_KEY,
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       moralis: !!process.env.MORALIS_API_KEY,
+      github: !!(process.env.GITHUB_TOKEN && process.env.GITHUB_OWNER && process.env.GITHUB_REPO),
       herald: !!(process.env.HERALD_GMAIL_USER && process.env.HERALD_GMAIL_APP_PASSWORD),
     },
   });
@@ -189,6 +191,20 @@ app.get("/api/unlocks", async (req, res) => {
     res.json({ ok: true, suggestions, totalUnlocksSeen: unlocks.totalEventsSeen });
   } catch (err) {
     res.status(500).json({ ok: false, reason: err.message, suggestions: [] });
+  }
+});
+
+app.post("/api/save-watched-wallet", async (req, res) => {
+  try {
+    const { ticker, chainId, address } = req.body;
+    if (!ticker || !chainId || !address) {
+      return res.status(400).json({ ok: false, reason: "ticker, chainId, and address are all required" });
+    }
+    const result = await saveWatchedWallet({ ticker: String(ticker), chainId: Number(chainId), address: String(address) });
+    if (!result.ok) console.error(`[github-writer] save failed for ${ticker}: ${result.reason}`);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, reason: err.message });
   }
 });
 
