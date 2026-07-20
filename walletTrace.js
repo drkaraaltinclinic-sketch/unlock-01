@@ -32,9 +32,10 @@ const ETHERSCAN_V2_BASE = "https://api.etherscan.io/v2/api";
 function loadConfig() {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf8");
-    return JSON.parse(raw);
-  } catch {
-    return { exchangeWallets: {}, watchedWallets: {} };
+    return { ok: true, data: JSON.parse(raw) };
+  } catch (err) {
+    console.error(`[wallet-trace] Failed to load/parse known-exchange-wallets.json: ${err.message}`);
+    return { ok: false, error: err.message, data: { exchangeWallets: {}, watchedWallets: {} } };
   }
 }
 
@@ -49,9 +50,20 @@ async function fetchWithTimeout(url, timeoutMs = 8000) {
 }
 
 async function checkWalletTransfers(ticker) {
-  const config = loadConfig();
+  const loaded = loadConfig();
+  if (!loaded.ok) {
+    return {
+      ok: false,
+      reason: `known-exchange-wallets.json failed to load or has invalid JSON: ${loaded.error} — check the file's syntax on GitHub (a stray comma or bracket will break it silently)`,
+    };
+  }
+  const config = loaded.data;
   const watched = config.watchedWallets[ticker.toUpperCase()];
   if (!watched || !watched.addresses || watched.addresses.length === 0) {
+    const actualKeys = Object.keys(config.watchedWallets || {});
+    console.error(
+      `[wallet-trace] No match for "${ticker.toUpperCase()}" — actual keys currently in watchedWallets: ${JSON.stringify(actualKeys)}`
+    );
     return {
       ok: false,
       reason:
