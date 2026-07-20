@@ -34,7 +34,8 @@
     "ACE": {
       "chainId": 56,
       "addresses": [
-        "0xa399452ae18ba9cd4eb8f193cbc8ada67b14b71c"
+        "0xa399452ae18ba9cd4eb8f193cbc8ada67b14b71c",
+        "0x87917d879ba83ce3ada6e02d49a10c1ec1988062"
       ]
     }
   }
