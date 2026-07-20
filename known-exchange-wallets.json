@@ -37,6 +37,12 @@
         "0xa399452ae18ba9cd4eb8f193cbc8ada67b14b71c",
         "0x87917d879ba83ce3ada6e02d49a10c1ec1988062"
       ]
+    },
+    "PROM": {
+      "chainId": 1,
+      "addresses": [
+        "0xe906445ad2761d7f2602e96e32d194172797112b"
+      ]
     }
   }
 }
