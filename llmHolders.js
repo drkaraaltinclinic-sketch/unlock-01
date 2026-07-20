@@ -1,22 +1,50 @@
 // llmHolders.js
 //
-// Uses Claude (Anthropic API, with the web_search tool) to look up a
-// token's current top holders directly from a block explorer page.
+// Two-stage token holder lookup, redesigned after the pure-LLM approach hit
+// a real wall: block explorer "Holders" tabs are JavaScript-rendered, so an
+// LLM's web_search tool (which only sees the raw pre-render HTML) could
+// never reliably read them. Splitting the job by what each tool is
+// actually good at:
 //
-// IMPORTANT — this is fundamentally different from every other data source
-// in this app: it's a best-effort LLM READ of a rendered webpage, not a
-// structured API response. Etherscan's own tokenholderlist endpoint (Pro
-// tier) would return guaranteed-accurate numbers; this instead asks Claude
-// to search, read, and transcribe a table. Treat results as a supplementary
-// hint, never as verified fact — the UI must always label this section
-// "AI-sourced, unverified" and it must never gate or block a trade setup.
+//   Stage 1 — Claude + web_search resolves ticker -> {chain, contractAddress}.
+//   This is a good fit for search: contract addresses are plain, indexable
+//   text on CoinGecko/CoinMarketCap pages and project docs, not a rendered
+//   table. Still a best-effort LLM step — verify the returned address
+//   against what you see on Binance/CoinGecko before fully trusting it.
+//
+//   Stage 2 — Moralis's real Token Owners API (deep-index.moralis.io)
+//   returns the actual top holders as structured JSON, pre-labeled with
+//   known exchange/entity names by Moralis itself — not an LLM guess.
+//   Free Starter plan: 40,000 CU/day, this endpoint costs 50 CU/call,
+//   so roughly 800 calls/day headroom — far more than a personal scan
+//   tool needs.
+//
+// Net effect: the holder *numbers* are now genuinely structured/verified.
+// The only remaining LLM-dependent step is contract-address resolution,
+// which is why the UI still shows the resolved address for you to
+// eyeball-confirm, and still carries a lighter-touch caution label.
 
 const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
+const MORALIS_API = "https://deep-index.moralis.io/api/v2.2";
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
-// LLM + web search round-trips are much slower than a direct API call, so
-// this gets a longer timeout than the Binance/DropsTab/Etherscan calls.
-async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
+const MORALIS_CHAIN_MAP = {
+  ethereum: "eth",
+  eth: "eth",
+  bsc: "bsc",
+  "bnb chain": "bsc",
+  "bnb smart chain": "bsc",
+  polygon: "polygon",
+  arbitrum: "arbitrum",
+  base: "base",
+  optimism: "optimism",
+  avalanche: "avalanche",
+  cronos: "cronos",
+  gnosis: "gnosis",
+  linea: "linea",
+};
+
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 20000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -26,18 +54,20 @@ async function fetchWithTimeout(url, opts = {}, timeoutMs = 25000) {
   }
 }
 
-async function getLlmTokenHolders(ticker) {
+// ── Stage 1: Claude + web_search resolves ticker -> contract address ──
+
+async function resolveContractAddress(ticker) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { ok: false, reason: "ANTHROPIC_API_KEY not set" };
 
   const model = process.env.CLAUDE_HOLDER_MODEL || DEFAULT_MODEL;
 
-  const prompt = `Identify the blockchain and contract address for the cryptocurrency with ticker symbol "${ticker}" (it trades as a ${ticker}USDT perpetual futures pair on Binance). Then look up that token's "Holders" / "Top Holders" tab on the appropriate block explorer (Etherscan for Ethereum, BscScan for BNB Chain, or the equivalent explorer for other EVM chains), and report the top 8 holder addresses currently shown there.
+  const prompt = `Identify the blockchain and contract address for the cryptocurrency with ticker symbol "${ticker}" (it trades as a ${ticker}USDT perpetual futures pair on Binance). Contract addresses are normally listed in plain text on the token's CoinGecko page, CoinMarketCap page, or official project docs — look there.
 
 Respond with ONLY a JSON object — no other text, no markdown code fences — in exactly this shape:
-{"chain": "ethereum", "contractAddress": "0x...", "holders": [{"address": "0x...", "percentage": 12.34, "label": "exchange wallet or team/vesting or null"}]}
+{"chain": "ethereum", "contractAddress": "0x..."}
 
-If you cannot confidently find this data, respond with exactly: {"error": "brief reason"}`;
+If you cannot confidently find this, respond with exactly: {"error": "brief reason"}`;
 
   try {
     const res = await fetchWithTimeout(
@@ -51,12 +81,12 @@ If you cannot confidently find this data, respond with exactly: {"error": "brief
         },
         body: JSON.stringify({
           model,
-          max_tokens: 1024,
+          max_tokens: 512,
           messages: [{ role: "user", content: prompt }],
           tools: [{ type: "web_search_20250305", name: "web_search" }],
         }),
       },
-      25000
+      20000
     );
 
     if (!res.ok) {
@@ -70,8 +100,6 @@ If you cannot confidently find this data, respond with exactly: {"error": "brief
       .map((b) => b.text)
       .join("\n");
 
-    // Strip markdown fences, then extract the JSON object even if the model
-    // added a preamble before it despite instructions not to.
     const cleaned = textBlocks.replace(/```json|```/g, "").trim();
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     const jsonCandidate = jsonMatch ? jsonMatch[0] : cleaned;
@@ -80,34 +108,71 @@ If you cannot confidently find this data, respond with exactly: {"error": "brief
     try {
       parsed = JSON.parse(jsonCandidate);
     } catch (parseErr) {
-      console.error(
-        `[llm-holders] ${ticker}: couldn't parse JSON from Claude's response — raw text:`,
-        cleaned.slice(0, 500)
-      );
-      return { ok: false, reason: "Could not parse holder data from Claude's response" };
+      console.error(`[holder-lookup] ${ticker}: couldn't parse contract-resolution JSON — raw:`, cleaned.slice(0, 500));
+      return { ok: false, reason: "Could not parse contract address from Claude's response" };
     }
 
-    if (parsed.error) {
-      return { ok: false, reason: parsed.error };
+    if (parsed.error) return { ok: false, reason: parsed.error };
+    if (!parsed.chain || !parsed.contractAddress) {
+      return { ok: false, reason: "Claude's response was missing chain or contractAddress" };
     }
 
-    if (!Array.isArray(parsed.holders) || parsed.holders.length === 0) {
-      console.error(
-        `[llm-holders] ${ticker}: response had no usable holders array — raw:`,
-        JSON.stringify(parsed).slice(0, 500)
-      );
-      return { ok: false, reason: "No holder data found in Claude's response" };
-    }
-
-    return {
-      ok: true,
-      chain: parsed.chain || null,
-      contractAddress: parsed.contractAddress || null,
-      holders: parsed.holders,
-    };
+    return { ok: true, chain: parsed.chain, contractAddress: parsed.contractAddress };
   } catch (err) {
     return { ok: false, reason: err.message };
   }
+}
+
+// ── Stage 2: Moralis's real Token Owners API — structured, pre-labeled ──
+
+async function getMoralisTopHolders(chain, contractAddress, limit = 8) {
+  const key = process.env.MORALIS_API_KEY;
+  if (!key) return { ok: false, reason: "MORALIS_API_KEY not set" };
+
+  const moralisChain = MORALIS_CHAIN_MAP[chain.toLowerCase().trim()] || chain.toLowerCase().trim();
+
+  try {
+    const res = await fetchWithTimeout(
+      `${MORALIS_API}/erc20/${contractAddress}/owners?chain=${encodeURIComponent(moralisChain)}&limit=${limit}&order=DESC`,
+      { headers: { "X-API-Key": key } },
+      15000
+    );
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      return { ok: false, reason: `Moralis ${res.status}${body ? `: ${body.slice(0, 200)}` : ""}` };
+    }
+    const data = await res.json();
+    const result = Array.isArray(data.result) ? data.result : [];
+    const holders = result.map((h) => ({
+      address: h.owner_address,
+      percentage: h.percentage_relative_to_total_supply,
+      label: h.owner_address_label || h.entity || null,
+      usdValue: h.usd_value || null,
+    }));
+    return { ok: true, holders, totalSupply: data.total_supply || null };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
+// ── Combined pipeline — same exported shape as before, so server.js and
+// index.html need no changes at all ──
+
+async function getLlmTokenHolders(ticker) {
+  const resolved = await resolveContractAddress(ticker);
+  if (!resolved.ok) return resolved;
+
+  const holdersResult = await getMoralisTopHolders(resolved.chain, resolved.contractAddress, 8);
+  if (!holdersResult.ok) {
+    return { ok: false, reason: `resolved ${ticker} to ${resolved.contractAddress} on ${resolved.chain}, but Moralis lookup failed: ${holdersResult.reason}` };
+  }
+
+  return {
+    ok: true,
+    chain: resolved.chain,
+    contractAddress: resolved.contractAddress,
+    holders: holdersResult.holders,
+  };
 }
 
 module.exports = { getLlmTokenHolders };
