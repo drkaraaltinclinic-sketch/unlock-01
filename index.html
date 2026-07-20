@@ -229,10 +229,13 @@ function fmt(n) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 4 });
 }
 
+function normalizeChainName(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
 const CHAIN_ID_MAP = {
-  ethereum: 1, eth: 1, mainnet: 1, 'ethereum mainnet': 1,
-  bsc: 56, bnb: 56, 'bnb chain': 56, 'bnb smart chain': 56, 'binance smart chain': 56, 'binance chain': 56,
-  arbitrum: 42161, 'arbitrum one': 42161,
+  ethereum: 1, eth: 1, mainnet: 1, ethereummainnet: 1,
+  bsc: 56, bnb: 56, bnbchain: 56, bnbsmartchain: 56, binancesmartchain: 56, binancechain: 56,
+  arbitrum: 42161, arbitrumone: 42161,
   base: 8453,
   polygon: 137, matic: 137,
   avalanche: 43114, avax: 43114,
@@ -249,7 +252,7 @@ function renderLlmHolders(t) {
     return `<div class="setup-title" style="color:var(--signal);">⚠ HOLDER LOOKUP</div>
       <div class="skipped" style="margin-bottom:12px;">Lookup succeeded but returned no holders.</div>`;
   }
-  const chainKey = (t.llmHolders.chain || '').toLowerCase().trim();
+  const chainKey = normalizeChainName(t.llmHolders.chain);
   const chainId = CHAIN_ID_MAP[chainKey] || null;
   const rows = t.llmHolders.holders.map(h => {
     const short = h.address && h.address.length > 12 ? `${h.address.slice(0, 6)}...${h.address.slice(-4)}` : (h.address || '?');
