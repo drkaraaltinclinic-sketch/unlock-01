@@ -154,6 +154,9 @@
   .tranche-row { display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 6px 10px; background: var(--bg); border-radius: 4px; }
   .copy-snippet-btn { background: transparent; border: 1px solid var(--muted); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
   .copy-snippet-btn:hover { border-color: var(--data); color: var(--data); }
+  .save-github-btn { background: transparent; border: 1px solid var(--ok); color: var(--ok); font-family: 'JetBrains Mono', monospace; font-size: 10px; padding: 3px 8px; border-radius: 3px; cursor: pointer; }
+  .save-github-btn:hover { background: rgba(76,175,125,0.12); }
+  .save-github-btn:disabled { opacity: .5; cursor: default; }
   .footer-note { margin-top: 40px; font-size: 12px; color: var(--muted); text-align: center; line-height: 1.7; }
   .empty { color: var(--muted); text-align: center; padding: 40px 0; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
   .herald-status { font-family: 'JetBrains Mono', monospace; font-size: 13px; padding: 10px 16px; border-radius: 4px; margin-bottom: 14px; }
@@ -260,12 +263,16 @@ function renderLlmHolders(t) {
     // Moralis labels are real (e.g. "Binance Hot Wallet 20", "Coinbase 1") —
     // any non-null label means it's a known/identified entity, not a
     // candidate unlock/team wallet worth watching. Only unlabeled holders
-    // get a copy button.
+    // get action buttons.
     const isKnownEntity = !!h.label;
-    const copyBtn = (!isKnownEntity && h.address)
-      ? `<button class="copy-snippet-btn" data-ticker="${t.ticker}" data-chainid="${chainId || ''}" data-chainname="${t.llmHolders.chain || 'unknown'}" data-address="${h.address}">COPY SNIPPET</button>`
-      : '';
-    return `<div class="tranche-row"><span>${short}${labelPart}</span><span style="display:flex;align-items:center;gap:10px;">${h.percentage}% ${copyBtn}</span></div>`;
+    let actionBtns = '';
+    if (!isKnownEntity && h.address) {
+      actionBtns = `<button class="copy-snippet-btn" data-ticker="${t.ticker}" data-chainid="${chainId || ''}" data-chainname="${t.llmHolders.chain || 'unknown'}" data-address="${h.address}">COPY SNIPPET</button>`;
+      if (chainId) {
+        actionBtns += `<button class="save-github-btn" data-ticker="${t.ticker}" data-chainid="${chainId}" data-address="${h.address}">SAVE TO GITHUB</button>`;
+      }
+    }
+    return `<div class="tranche-row"><span>${short}${labelPart}</span><span style="display:flex;align-items:center;gap:10px;">${h.percentage}% ${actionBtns}</span></div>`;
   }).join('');
   const contractLine = t.llmHolders.contractAddress
     ? `<div style="font-size:11px;color:var(--muted);margin-top:6px;">Contract (AI-resolved, verify before trusting): ${t.llmHolders.contractAddress}</div>`
@@ -410,6 +417,43 @@ document.getElementById('report').addEventListener('click', async (e) => {
 
   if (unrecognizedChain) {
     alert(`Copied — but the chain "${chainName}" wasn't recognized, so chainId was set to 0 as a placeholder (not a real chain).\n\nBefore committing, replace the 0 with the correct numeric chainId for "${chainName}" (common ones: Ethereum=1, BSC=56, Arbitrum=42161, Base=8453, Polygon=137).`);
+  }
+});
+
+document.getElementById('report').addEventListener('click', async (e) => {
+  if (!e.target.classList.contains('save-github-btn')) return;
+  const btn = e.target;
+  const ticker = btn.dataset.ticker;
+  const chainId = btn.dataset.chainid;
+  const address = btn.dataset.address;
+
+  if (!confirm(`Save ${ticker}'s watched wallet (${address}) directly to known-exchange-wallets.json on GitHub? This commits to your repo and triggers a Railway redeploy.`)) {
+    return;
+  }
+
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'SAVING...';
+
+  try {
+    const res = await fetch('/api/save-watched-wallet', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticker, chainId: Number(chainId), address })
+    });
+    const j = await res.json();
+    if (j.ok) {
+      btn.textContent = 'SAVED ✓';
+      btn.style.opacity = '1';
+    } else {
+      btn.textContent = original;
+      alert('Save failed: ' + (j.reason || 'unknown reason'));
+    }
+  } catch (err) {
+    btn.textContent = original;
+    alert('Save failed: ' + err.message);
+  } finally {
+    if (btn.textContent !== 'SAVED ✓') btn.disabled = false;
   }
 });
 
