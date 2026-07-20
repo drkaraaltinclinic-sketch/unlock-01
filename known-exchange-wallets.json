@@ -43,6 +43,12 @@
       "addresses": [
         "0xe906445ad2761d7f2602e96e32d194172797112b"
       ]
+    },
+    "HEMI": {
+      "chainId": 1,
+      "addresses": [
+        "0x694fa0816999da16e8783c0f5cde68c13a33c4e6"
+      ]
     }
   }
 }
