@@ -28,21 +28,30 @@ const ANTHROPIC_API = "https://api.anthropic.com/v1/messages";
 const MORALIS_API = "https://deep-index.moralis.io/api/v2.2";
 const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 
+// Normalize away spaces, hyphens, underscores before matching, so
+// "bnb chain", "bnb-chain", "BNB_Chain", and "bnbchain" all match the same
+// key — this closes the whole class of bug where an LLM phrases the same
+// chain name with different punctuation each time (we've now seen "bnb",
+// "binance smart chain", and "binance-smart-chain" for the same chain).
+function normalizeChainName(s) {
+  return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 const MORALIS_CHAIN_MAP = {
   ethereum: "eth",
   eth: "eth",
   mainnet: "eth",
-  "ethereum mainnet": "eth",
+  ethereummainnet: "eth",
   bsc: "bsc",
   bnb: "bsc",
-  "bnb chain": "bsc",
-  "bnb smart chain": "bsc",
-  "binance smart chain": "bsc",
-  "binance chain": "bsc",
+  bnbchain: "bsc",
+  bnbsmartchain: "bsc",
+  binancesmartchain: "bsc",
+  binancechain: "bsc",
   polygon: "polygon",
   matic: "polygon",
   arbitrum: "arbitrum",
-  "arbitrum one": "arbitrum",
+  arbitrumone: "arbitrum",
   base: "base",
   optimism: "optimism",
   op: "optimism",
@@ -138,10 +147,10 @@ async function getMoralisTopHolders(chain, contractAddress, limit = 8) {
   const key = process.env.MORALIS_API_KEY;
   if (!key) return { ok: false, reason: "MORALIS_API_KEY not set" };
 
-  const chainKey = chain.toLowerCase().trim();
-  const moralisChain = MORALIS_CHAIN_MAP[chainKey] || chainKey;
+  const chainKey = normalizeChainName(chain);
+  const moralisChain = MORALIS_CHAIN_MAP[chainKey] || chain.toLowerCase().trim();
   if (!MORALIS_CHAIN_MAP[chainKey]) {
-    console.error(`[holder-lookup] chain "${chain}" not in MORALIS_CHAIN_MAP — passing through as "${moralisChain}" and hoping it matches Moralis's enum. Add it to the map if this fails.`);
+    console.error(`[holder-lookup] chain "${chain}" (normalized: "${chainKey}") not in MORALIS_CHAIN_MAP — passing through as "${moralisChain}" and hoping it matches Moralis's enum. Add it to the map if this fails.`);
   }
 
   try {
