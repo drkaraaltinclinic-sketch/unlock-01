@@ -124,6 +124,7 @@ app.get("/api/status", (req, res) => {
       dropstab: !!process.env.DROPSTAB_API_KEY,
       etherscan: !!process.env.ETHERSCAN_API_KEY,
       anthropic: !!process.env.ANTHROPIC_API_KEY,
+      moralis: !!process.env.MORALIS_API_KEY,
       herald: !!(process.env.HERALD_GMAIL_USER && process.env.HERALD_GMAIL_APP_PASSWORD),
     },
   });
