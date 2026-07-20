@@ -92,6 +92,11 @@
     .scan-btn.scanning .ring { animation: none; opacity: .6; }
   }
   .hero-label { margin-top: 16px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--muted); text-align: center; max-width: 380px; }
+  .deploy-watch-btn { margin-top: 20px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .04em; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+  .deploy-watch-btn:hover { border-color: var(--data); color: var(--data); }
+  .deploy-watch-btn.watching { border-color: var(--data); color: var(--data); animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+  .deploy-watch-note { margin-top: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted); text-align: center; max-width: 380px; }
 
   .controls {
     background: var(--panel);
@@ -177,6 +182,8 @@
       RUN SCAN
     </button>
     <div class="hero-label">Pulls the setup for up to 3 tickers below — funding, order book, tokenomics, squeeze score, wallet trace, short setup.</div>
+    <button class="deploy-watch-btn" id="deployWatchBtn" type="button">⏱ WAIT FOR DEPLOY, THEN SCAN</button>
+    <div id="deployWatchNote" class="deploy-watch-note"></div>
   </div>
 
   <div class="controls">
@@ -457,7 +464,7 @@ document.getElementById('report').addEventListener('click', async (e) => {
   }
 });
 
-document.getElementById('scanBtn').addEventListener('click', async () => {
+async function runScan() {
   const btn = document.getElementById('scanBtn');
   const tickers = ['t1','t2','t3'].map(id => document.getElementById(id).value.trim()).filter(Boolean);
   if (tickers.length === 0) {
@@ -498,6 +505,67 @@ document.getElementById('scanBtn').addEventListener('click', async () => {
     btn.classList.remove('scanning');
     btn.disabled = false;
   }
+}
+
+document.getElementById('scanBtn').addEventListener('click', runScan);
+
+let deployWatchInterval = null;
+let deployWatchTimeout = null;
+
+function stopDeployWatch(finalNote) {
+  if (deployWatchInterval) clearInterval(deployWatchInterval);
+  if (deployWatchTimeout) clearTimeout(deployWatchTimeout);
+  deployWatchInterval = null;
+  deployWatchTimeout = null;
+  document.getElementById('deployWatchBtn').classList.remove('watching');
+  document.getElementById('deployWatchBtn').textContent = '⏱ WAIT FOR DEPLOY, THEN SCAN';
+  if (finalNote !== undefined) document.getElementById('deployWatchNote').textContent = finalNote;
+}
+
+document.getElementById('deployWatchBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('deployWatchBtn');
+  const note = document.getElementById('deployWatchNote');
+
+  // Clicking again while watching cancels it
+  if (deployWatchInterval) {
+    stopDeployWatch('Cancelled.');
+    return;
+  }
+
+  let baselineStartedAt;
+  try {
+    const res = await fetch('/api/status');
+    const j = await res.json();
+    baselineStartedAt = j.startedAt;
+  } catch (err) {
+    note.textContent = 'Could not reach the server to establish a baseline — try again in a moment.';
+    return;
+  }
+
+  btn.classList.add('watching');
+  btn.textContent = '⏱ WATCHING (click to cancel)';
+  note.textContent = 'Watching for the next deploy to finish — push your commit whenever you\'re ready.';
+
+  deployWatchInterval = setInterval(async () => {
+    try {
+      const res = await fetch('/api/status');
+      const j = await res.json();
+      if (j.startedAt && j.startedAt !== baselineStartedAt) {
+        stopDeployWatch('✓ New deployment detected — running scan now.');
+        runScan();
+      }
+    } catch (err) {
+      // A single failed poll is expected mid-restart (the old process can
+      // drop connections right before the new one comes up) — just keep
+      // polling rather than treating one failure as anything meaningful.
+    }
+  }, 5000);
+
+  // Give up after 10 minutes rather than polling forever if something
+  // goes wrong and no new deploy ever shows up.
+  deployWatchTimeout = setTimeout(() => {
+    stopDeployWatch('Gave up after 10 minutes — no new deployment detected. Click to try again.');
+  }, 10 * 60 * 1000);
 });
 </script>
 </body>
