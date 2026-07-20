@@ -230,8 +230,13 @@ function fmt(n) {
 }
 
 const CHAIN_ID_MAP = {
-  ethereum: 1, eth: 1, bsc: 56, 'bnb chain': 56, 'bnb smart chain': 56,
-  arbitrum: 42161, base: 8453, polygon: 137, avalanche: 43114, optimism: 10,
+  ethereum: 1, eth: 1, mainnet: 1, 'ethereum mainnet': 1,
+  bsc: 56, bnb: 56, 'bnb chain': 56, 'bnb smart chain': 56, 'binance smart chain': 56, 'binance chain': 56,
+  arbitrum: 42161, 'arbitrum one': 42161,
+  base: 8453,
+  polygon: 137, matic: 137,
+  avalanche: 43114, avax: 43114,
+  optimism: 10, op: 10,
 };
 
 function renderLlmHolders(t) {
@@ -379,8 +384,16 @@ document.getElementById('report').addEventListener('click', async (e) => {
   const chainName = btn.dataset.chainname;
   const address = btn.dataset.address;
 
-  const chainIdLine = chainId ? chainId : `null /* unrecognized chain: "${chainName}" — look up the correct chainId and replace null */`;
-  const snippet = `"${ticker}": { "chainId": ${chainIdLine}, "addresses": ["${address}"] }`;
+  // IMPORTANT: JSON has no comment syntax. Whatever gets copied here must
+  // always be valid JSON on its own, since it gets pasted directly into
+  // known-exchange-wallets.json — an invalid comment here breaks wallet
+  // tracing for every ticker, not just this one, and does so silently.
+  // So the unrecognized-chain case uses a numeric sentinel (0, not a real
+  // chain ID) instead of an inline comment, and the "look this up" warning
+  // goes in a separate alert box, never inside the copied text itself.
+  const unrecognizedChain = !chainId;
+  const chainIdValue = unrecognizedChain ? 0 : chainId;
+  const snippet = `"${ticker}": { "chainId": ${chainIdValue}, "addresses": ["${address}"] }`;
 
   try {
     await navigator.clipboard.writeText(snippet);
@@ -389,6 +402,11 @@ document.getElementById('report').addEventListener('click', async (e) => {
     setTimeout(() => { btn.textContent = original; }, 1500);
   } catch (err) {
     alert('Could not copy automatically — here is the snippet:\n\n' + snippet);
+    return;
+  }
+
+  if (unrecognizedChain) {
+    alert(`Copied — but the chain "${chainName}" wasn't recognized, so chainId was set to 0 as a placeholder (not a real chain).\n\nBefore committing, replace the 0 with the correct numeric chainId for "${chainName}" (common ones: Ethereum=1, BSC=56, Arbitrum=42161, Base=8453, Polygon=137).`);
   }
 });
 
