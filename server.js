@@ -18,6 +18,10 @@ app.use(express.json());
 app.use(express.static(__dirname));
 
 const PORT = process.env.PORT || 8080;
+// Captured once at process start — a fresh value here means a new
+// deployment actually booted, which is what lets the dashboard detect
+// "the redeploy finished" without needing any Railway API access.
+const SERVER_STARTED_AT = new Date().toISOString();
 
 async function analyzeTicker(ticker, includeLlmHolders) {
   const perp = await ds.hasBinancePerp(ticker);
@@ -121,6 +125,7 @@ app.get("/api/status", (req, res) => {
   res.json({
     agent: "UNLOCK-01",
     status: "online",
+    startedAt: SERVER_STARTED_AT,
     configured: {
       dropstab: !!process.env.DROPSTAB_API_KEY,
       etherscan: !!process.env.ETHERSCAN_API_KEY,
