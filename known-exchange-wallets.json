@@ -20,7 +20,7 @@
       ]
     }
   },
-  "watchedWallets": {
+  "watchedWallets": {"BANK": { "chainId": null /* unrecognized chain: "bnb" — look up the correct chainId and replace null */, "addresses": ["0xede6d2301178d364a5b011260694aa6688c3b11a"] }
     "_example_ARB": { "chainId": 1, "addresses": [] }
   }
 }
