@@ -20,7 +20,8 @@
       ]
     }
   },
-"BANK": { "chainId": 56, "addresses": ["0xede6d2301178d364a5b011260694aa6688c3b11a"] },
+  "watchedWallets": {
+    "BANK": { "chainId": 56, "addresses": ["0xede6d2301178d364a5b011260694aa6688c3b11a"] },
     "_example_ARB": { "chainId": 1, "addresses": [] }
   }
 }
