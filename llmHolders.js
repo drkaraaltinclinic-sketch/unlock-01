@@ -31,14 +31,23 @@ const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const MORALIS_CHAIN_MAP = {
   ethereum: "eth",
   eth: "eth",
+  mainnet: "eth",
+  "ethereum mainnet": "eth",
   bsc: "bsc",
+  bnb: "bsc",
   "bnb chain": "bsc",
   "bnb smart chain": "bsc",
+  "binance smart chain": "bsc",
+  "binance chain": "bsc",
   polygon: "polygon",
+  matic: "polygon",
   arbitrum: "arbitrum",
+  "arbitrum one": "arbitrum",
   base: "base",
   optimism: "optimism",
+  op: "optimism",
   avalanche: "avalanche",
+  avax: "avalanche",
   cronos: "cronos",
   gnosis: "gnosis",
   linea: "linea",
@@ -129,7 +138,11 @@ async function getMoralisTopHolders(chain, contractAddress, limit = 8) {
   const key = process.env.MORALIS_API_KEY;
   if (!key) return { ok: false, reason: "MORALIS_API_KEY not set" };
 
-  const moralisChain = MORALIS_CHAIN_MAP[chain.toLowerCase().trim()] || chain.toLowerCase().trim();
+  const chainKey = chain.toLowerCase().trim();
+  const moralisChain = MORALIS_CHAIN_MAP[chainKey] || chainKey;
+  if (!MORALIS_CHAIN_MAP[chainKey]) {
+    console.error(`[holder-lookup] chain "${chain}" not in MORALIS_CHAIN_MAP — passing through as "${moralisChain}" and hoping it matches Moralis's enum. Add it to the map if this fails.`);
+  }
 
   try {
     const res = await fetchWithTimeout(
