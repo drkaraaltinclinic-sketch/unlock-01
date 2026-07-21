@@ -50,6 +50,12 @@
         "0x694fa0816999da16e8783c0f5cde68c13a33c4e6",
         "0x5eaa10f99e7e6d177ef9f74e519e319aa49f191e"
       ]
+    },
+    "KAITO": {
+      "chainId": 8453,
+      "addresses": [
+        "0x50ffe6019c38e4135fe1f864e4a2561d819dfc7e"
+      ]
     }
   }
 }
