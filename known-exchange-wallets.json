@@ -63,6 +63,12 @@
         "0x99d4b3f50b14bfc67892c472f4053ee3483d87b9",
         "0x49a0c2366936b115d6877438175ee4b97d6dab7c"
       ]
+    },
+    "RE": {
+      "chainId": 1,
+      "addresses": [
+        "0xa600ec7db69dfcd21f19face5b209a55eab7a7c0"
+      ]
     }
   }
 }
