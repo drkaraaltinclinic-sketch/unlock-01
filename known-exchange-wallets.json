@@ -69,6 +69,12 @@
       "addresses": [
         "0xa600ec7db69dfcd21f19face5b209a55eab7a7c0"
       ]
+    },
+    "ZAMA": {
+      "chainId": 1,
+      "addresses": [
+        "0x6aed4db2305b22cff494a15433975b7cc2732b28"
+      ]
     }
   }
 }
